@@ -24,6 +24,7 @@ constexpr auto round_div(T a, T2 b)
 
 std::string ascii_lower(const std::string &);
 std::string ascii_upper(const std::string &);
+std::string reverse_string(const std::string &);
 
 }
 
