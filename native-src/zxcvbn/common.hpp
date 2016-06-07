@@ -24,7 +24,8 @@ using idx_t = std::string::size_type;
   MATCH_FN(Repeat, REPEAT, repeat) \
   MATCH_FN(Sequence, SEQUENCE, sequence) \
   MATCH_FN(Regex, REGEX, regex) \
-  MATCH_FN(Date, DATE, date)
+  MATCH_FN(Date, DATE, date) \
+  MATCH_FN(Bruteforce, BRUTEFORCE, bruteforce)
 
 enum class RegexTag {
   RECENT_YEAR,
@@ -116,6 +117,10 @@ struct DateMatch {
   std::string separator;
   unsigned year, month, day;
   bool has_full_year;
+};
+
+struct BruteforceMatch {
+  static constexpr auto pattern = MatchPattern::BRUTEFORCE;
 };
 
 // Define new match types here
