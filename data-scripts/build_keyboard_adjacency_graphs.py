@@ -1,7 +1,7 @@
 #!/usr/bin/python
 import os
 import sys
-import simplejson
+import json
 
 def usage():
     return '''
@@ -102,7 +102,7 @@ def output_coffee(path):
         lines = []
         for graph_name, args in GRAPHS:
             graph = build_graph(*args)
-            lines.append('%s: %s' % (graph_name, simplejson.dumps(graph, sort_keys=True)))
+            lines.append('%s: %s' % (graph_name, json.dumps(graph, sort_keys=True)))
         f.write('\n  '.join(lines))
         f.write('\n\n')
         f.write('module.exports = adjacency_graphs\n')
