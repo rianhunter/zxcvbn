@@ -1,6 +1,11 @@
 test = require 'tape'
-matching = require '../src/matching'
-adjacency_graphs = require '../src/adjacency_graphs'
+
+ROOT = "../src"
+if process.env.ROOT
+  ROOT = process.env.ROOT
+
+matching = require (ROOT + '/matching')
+adjacency_graphs = require (ROOT + '/adjacency_graphs')
 
 # takes a pattern and list of prefixes/suffixes
 # returns a bunch of variants of that pattern embedded
@@ -51,6 +56,7 @@ check_matches = (prefix, t, matches, pattern_names, patterns, ijs, props) ->
 
 
 test 'matching utils', (t) ->
+  return t.end() if matching.no_util
   t.ok matching.empty([]), ".empty returns true for an empty array"
   t.ok matching.empty({}), ".empty returns true for an empty object"
   for obj in [
