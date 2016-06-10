@@ -71,36 +71,6 @@ constexpr std::initializer_list<std::pair<int, int>> DATE_SPLITS[] = {
 };
 
 static
-std::vector<Match> dictionary_match(const std::string & password,
-                                    const RankedDicts & ranked_dictionaries);
-
-static
-std::vector<Match> reverse_dictionary_match(const std::string & password,
-                                            const RankedDicts & ranked_dictionaries);
-
-static
-std::vector<Match> l33t_match(const std::string & password,
-                              const RankedDicts & ranked_dictionaries,
-                              const std::vector<std::pair<std::string, std::vector<std::string>>> & l33t_table);
-
-static
-std::vector<Match> spatial_match(const std::string & password,
-                                 const Graphs & graphs);
-
-static
-std::vector<Match> repeat_match(const std::string & password);
-
-static
-std::vector<Match> sequence_match(const std::string & password);
-
-static
-std::vector<Match> regex_match(const std::string & password,
-                               const std::vector<std::pair<RegexTag, std::regex>> & regex);
-
-static
-std::vector<Match> date_match(const std::string & password);
-
-static
 std::string translate(const std::string & string,
                       const std::unordered_map<std::string, std::string> & chr_map) {
   std::string toret;
@@ -163,7 +133,6 @@ std::vector<Match> omnimatch(const std::string & password,
 //  dictionary match (common passwords, english, last names, etc) ----------------
 //-------------------------------------------------------------------------------
 
-static
 std::vector<Match> dictionary_match(const std::string & password,
                                     const RankedDicts & ranked_dictionaries) {
   std::vector<Match> matches;
@@ -194,7 +163,6 @@ std::vector<Match> dictionary_match(const std::string & password,
   return sorted(matches);
 }
 
-static
 std::vector<Match> reverse_dictionary_match(const std::string & password,
                                             const RankedDicts & ranked_dictionaries) {
   auto reversed_password = util::reverse_string(password);
@@ -217,7 +185,6 @@ std::vector<Match> reverse_dictionary_match(const std::string & password,
 //-------------------------------------------------------------------------------
 
 // makes a pruned copy of l33t_table that only includes password's possible substitutions
-static
 std::unordered_map<std::string, std::vector<std::string>> relevant_l33t_subtable(const std::string & password, const std::vector<std::pair<std::string, std::vector<std::string>>> & table) {
   std::unordered_map<std::string, std::vector<std::string>> subtable;
   for (const auto & item : table) {
@@ -238,7 +205,6 @@ std::unordered_map<std::string, std::vector<std::string>> relevant_l33t_subtable
 }
 
 // returns the list of possible 1337 replacement dictionaries for a given password
-static
 std::vector<std::unordered_map<std::string, std::string>> enumerate_l33t_subs(const std::unordered_map<std::string, std::vector<std::string>> & table) {
   using SubsType = std::vector<std::vector<std::pair<std::string, std::string>>>;
   SubsType subs = {{}};
@@ -298,7 +264,6 @@ std::vector<std::unordered_map<std::string, std::string>> enumerate_l33t_subs(co
   return sub_dicts;
 }
 
-static
 std::vector<Match> l33t_match(const std::string & password,
                               const RankedDicts & ranked_dictionaries,
                               const std::vector<std::pair<std::string, std::vector<std::string>>> & l33t_table) {
@@ -357,7 +322,6 @@ std::vector<Match> spatial_match_helper(const std::string & password,
                                         const Graph & graph,
                                         GraphTag tag);
 
-static
 std::vector<Match> spatial_match(const std::string & password,
                                  const Graphs & graphs) {
   std::vector<Match> matches;
@@ -457,7 +421,6 @@ std::vector<Match> spatial_match_helper(const std::string & password,
 // repeats (aaa, abcabcabc) and sequences (abcdef) ------------------------------
 //-------------------------------------------------------------------------------
 
-static
 std::vector<Match> repeat_match(const std::string & password) {
   std::vector<Match> matches;
   std::regex greedy(R"((.+)\1+)");
@@ -524,7 +487,6 @@ std::vector<Match> repeat_match(const std::string & password) {
 }
 
 const auto MAX_DELTA = 5;
-static
 std::vector<Match> sequence_match(const std::string & password) {
   // Identifies sequences by looking for repeated differences in unicode codepoint.
   // this allows skipping, such as 9753, and also matches some extended unicode sequences
@@ -600,7 +562,6 @@ std::vector<Match> sequence_match(const std::string & password) {
 // regex matching ---------------------------------------------------------------
 //-------------------------------------------------------------------------------
 
-static
 std::vector<Match> regex_match(const std::string & password,
                                const std::vector<std::pair<RegexTag, std::regex>> & regexen) {
   std::vector<Match> matches;
@@ -640,7 +601,6 @@ date_t stou(const std::string & a) {
   return static_cast<date_t>(std::stoul(a));
 }
 
-static
 std::vector<Match> date_match(const std::string & password) {
   // a "date" is recognized as:
   //   any 3-tuple that starts or ends with a 2- or 4-digit year,
