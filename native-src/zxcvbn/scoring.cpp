@@ -27,20 +27,6 @@ const auto MIN_GUESSES_BEFORE_GROWING_SEQUENCE = static_cast<guesses_t>(10000);
 const auto MIN_SUBMATCH_GUESSES_SINGLE_CHAR = static_cast<guesses_t>(10);
 const auto MIN_SUBMATCH_GUESSES_MULTI_CHAR = static_cast<guesses_t>(50);
 
-template<class T>
-T nCk(T n, T k) {
-  // http://blog.plover.com/math/choose.html
-  if (k > n) return 0;
-  if (k == 0) return 1;
-  T r = 1;
-  for (T d = 1; d <= k; ++d) {
-    r *= n;
-    r /= d;
-    n -= 1;
-  }
-  return n;
-}
-
 template<class Tret, class Tin>
 Tret factorial(Tin n) {
   // unoptimized, called only on small n
@@ -275,12 +261,6 @@ ScoringResult most_guessable_match_sequence(const std::string & password,
 // guess estimation -- one function per match pattern ---------------------------
 // ------------------------------------------------------------------------------
 
-#define MATCH_FN(title, upper, lower) \
-  static guesses_t lower##_guesses(const Match &);
-MATCH_RUN();
-#undef MATCH_FN
-
-static
 guesses_t estimate_guesses(Match & match, const std::string & password) {
   if (match.guesses) return match.guesses; // a match's guess estimate doesn't change. cache it.
   guesses_t min_guesses = 1;
@@ -301,7 +281,11 @@ guesses_t estimate_guesses(Match & match, const std::string & password) {
   return match.guesses;
 }
 
-static
+guesses_t unknown_guesses(const Match & match) {
+  assert(match.guesses);
+  return match.guesses;
+}
+
 guesses_t bruteforce_guesses(const Match & match) {
   auto guesses = std::pow(BRUTEFORCE_CARDINALITY, match.token.length());
   // small detail: make bruteforce matches at minimum one guess bigger than smallest allowed
@@ -312,12 +296,10 @@ guesses_t bruteforce_guesses(const Match & match) {
   return std::max(guesses, min_guesses);
 }
 
-static
 guesses_t repeat_guesses(const Match & match) {
   return match.get_repeat().base_guesses * match.get_repeat().repeat_count;
 }
 
-static
 guesses_t sequence_guesses(const Match & match) {
   // TODO: UTF-8
   auto first_chr = match.token.substr(0, 1);
@@ -346,9 +328,6 @@ guesses_t sequence_guesses(const Match & match) {
   return base_guesses * match.token.length();
 }
 
-const guesses_t MIN_YEAR_SPACE = 20;
-
-static
 guesses_t regex_guesses(const Match & match) {
   switch (match.get_regex().regex_tag) {
   case RegexTag::RECENT_YEAR:
@@ -381,7 +360,6 @@ guesses_t regex_guesses(const Match & match) {
   }
 }
 
-static
 guesses_t date_guesses(const Match & match) {
   // base guesses: (year distance from REFERENCE_YEAR) * num_days * num_years
   auto pre_year_space = match.get_date().year;
@@ -402,7 +380,6 @@ guesses_t date_guesses(const Match & match) {
   return guesses;
 }
 
-static
 guesses_t spatial_guesses(const Match & match) {
   std::size_t s;
   guesses_t d;
@@ -445,13 +422,6 @@ guesses_t spatial_guesses(const Match & match) {
   return guesses;
 }
 
-static
-guesses_t uppercase_variations(const Match & match);
-
-static
-guesses_t l33t_variations(const Match & match);
-
-static
 guesses_t dictionary_guesses(const Match & match) {
   auto base_guesses = match.get_dictionary().rank; // keep these as properties for display purposes
   auto uppercase_variations_ = uppercase_variations(match);
@@ -460,7 +430,6 @@ guesses_t dictionary_guesses(const Match & match) {
   return (base_guesses * uppercase_variations_ * l33t_variations_ * reversed_variations);
 }
 
-static
 guesses_t uppercase_variations(const Match & match) {
   auto & word = match.token;
   if (std::regex_match(word, ALL_LOWER) || util::ascii_lower(word) == word) return 1;
@@ -492,7 +461,6 @@ guesses_t uppercase_variations(const Match & match) {
   return variations;
 }
 
-static
 guesses_t l33t_variations(const Match & match) {
   auto & dmatch = match.get_dictionary();
   if (!dmatch.l33t) return 1;

@@ -29,13 +29,21 @@ clean:
 	-rm $(ZXCVBN_OBJECTS)
 
 .PHONY: test
-test: $(MATCHING_EXE) $(ADJACENCY_GRAPHS_EXE)
+test: test-matching test-scoring
+
+.PHONY: test-matching
+test-matching: $(MATCHING_EXE) $(ADJACENCY_GRAPHS_EXE)
 	ROOT="../lib" node_modules/.bin/coffeetape test/test-matching.coffee | node_modules/.bin/faucet
 
+.PHONY: test-scoring
+test-scoring: $(MATCHING_EXE) $(ADJACENCY_GRAPHS_EXE) $(SCORING_EXE)
+	ROOT="../lib" node_modules/.bin/coffeetape test/test-scoring.coffee | node_modules/.bin/faucet
 
 $(MATCHING_EXE): $(MATCHING_OBJECTS)
 	$(CXX) $(CXXLDFLAGS) $^ -o $@
 
+$(SCORING_EXE): $(SCORING_OBJECTS)
+	$(CXX) $(CXXLDFLAGS) $^ -o $@
 
 $(ADJACENCY_GRAPHS_EXE): $(ADJACENCY_GRAPHS_OBJECTS)
 	$(CXX) $(CXXLDFLAGS) $^ -o $@

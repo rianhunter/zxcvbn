@@ -11,6 +11,12 @@
 
 namespace zxcvbn_js {
 
+template<class T, class M>
+M _get_member_type(M T::*);
+
+// this makes me very sad
+#define GET_MEMBER_TYPE(f) decltype(_get_member_type(f))
+
 template<class T, typename = void>
 struct val_converter;
 
@@ -173,7 +179,146 @@ struct val_converter<zxcvbn::PortableRegexMatch> {
 
 template<>
 struct val_converter<zxcvbn::Match> {
-//  static zxcvbn::Match from(const emscripten::val &);
+  static zxcvbn::Match from(const emscripten::val & val) {
+    auto i = from_val_with_default<zxcvbn::idx_t>(val["i"], 0);
+    auto j = from_val_with_default<zxcvbn::idx_t>(val["j"], 0);
+    auto token = from_val_with_default<std::string>(val["token"], "");
+
+#define MATCH_FN(title, upper, lower) {#lower, zxcvbn::MatchPattern::upper},
+    const auto _default_name_to_pattern = std::unordered_map<std::string, zxcvbn::MatchPattern>{MATCH_RUN()};
+#undef MATCH_FN
+
+#define PARSE_MEMBER(class_, member) \
+    from_val<GET_MEMBER_TYPE(&zxcvbn::class_::member)>(val[#member])
+#define PARSE_MEMBER_DEF(class_, member, def)                           \
+    from_val_with_default<GET_MEMBER_TYPE(&zxcvbn::class_::member)>(val[#member], def)
+
+    auto match = [&] {
+      auto pattern = [&] {
+        if (val["pattern"].isUndefined()) {
+          // NB: object is not tagged with pattern, try inferring from members
+          if (!val["base_token"].isUndefined()) {
+            return zxcvbn::MatchPattern::REPEAT;
+          }
+          else if (!val["ascending"].isUndefined()) {
+            return zxcvbn::MatchPattern::SEQUENCE;
+          }
+          else if (!val["regex_name"].isUndefined()) {
+            return zxcvbn::MatchPattern::REGEX;
+          }
+          else if (!val["year"].isUndefined()) {
+            return zxcvbn::MatchPattern::DATE;
+          }
+          else if (!val["graph"].isUndefined()) {
+            return zxcvbn::MatchPattern::SPATIAL;
+          }
+          else if (!val["rank"].isUndefined() ||
+                   !val["l33t"].isUndefined()) {
+            return zxcvbn::MatchPattern::DICTIONARY;
+          }
+          return zxcvbn::MatchPattern::UNKNOWN;
+        }
+        auto pattern_str = val_converter<std::string>::from(val["pattern"]);
+        auto it = _default_name_to_pattern.find(pattern_str);
+        if (it == _default_name_to_pattern.end()) throw std::runtime_error("invalid match");
+        return it->second;
+      }();
+
+      switch (pattern) {
+      case zxcvbn::MatchPattern::DICTIONARY: {
+        auto dictionary_tag = [&] {
+          if (val["dictionary_name"].isUndefined()) {
+            return static_cast<zxcvbn::DictionaryTag>(0);
+          }
+          auto dictionary_name = val_converter<std::string>::from(val["dictionary_name"]);
+          const auto _default_name_to_tag = std::unordered_map<std::string, zxcvbn::DictionaryTag>{
+            {"passwords", zxcvbn::DictionaryTag::PASSWORDS},
+            {"english_wikipedia", zxcvbn::DictionaryTag::ENGLISH_WIKIPEDIA},
+            {"female_names", zxcvbn::DictionaryTag::FEMALE_NAMES},
+            {"surnames", zxcvbn::DictionaryTag::SURNAMES},
+            {"us_tv_and_film", zxcvbn::DictionaryTag::US_TV_AND_FILM},
+            {"male_names", zxcvbn::DictionaryTag::MALE_NAMES},
+            {"user_inputs", zxcvbn::DictionaryTag::USER_INPUTS},
+          };
+          auto it2 = _default_name_to_tag.find(dictionary_name);
+          if (it2 == _default_name_to_tag.end()) throw std::runtime_error("invalid dictionary");
+          return it2->second;
+        }();
+
+        auto default_sub = std::unordered_map<std::string, std::string>{};
+
+        return zxcvbn::Match(i, j, token, zxcvbn::DictionaryMatch{
+            dictionary_tag,
+              PARSE_MEMBER_DEF(DictionaryMatch, matched_word, ""),
+              PARSE_MEMBER_DEF(DictionaryMatch, rank, 0),
+              PARSE_MEMBER_DEF(DictionaryMatch, l33t, false),
+              PARSE_MEMBER_DEF(DictionaryMatch, reversed, false),
+              PARSE_MEMBER_DEF(DictionaryMatch, sub, default_sub),
+              PARSE_MEMBER_DEF(DictionaryMatch, sub_display, ""),
+              });
+      }
+      case zxcvbn::MatchPattern::SPATIAL: {
+        const auto _default_name_to_tag = std::unordered_map<std::string, zxcvbn::GraphTag>{
+          {"qwerty", zxcvbn::GraphTag::QWERTY},
+          {"dvorak", zxcvbn::GraphTag::DVORAK},
+          {"keypad", zxcvbn::GraphTag::KEYPAD},
+          {"mac_keypad", zxcvbn::GraphTag::MAC_KEYPAD},
+        };
+        auto graph_name = val_converter<std::string>::from(val["graph"]);
+        auto it2 = _default_name_to_tag.find(graph_name);
+        if (it2 == _default_name_to_tag.end()) throw std::runtime_error("bad graph tag!");
+        auto graph = it2->second;
+
+        return zxcvbn::Match(i, j, token, zxcvbn::SpatialMatch{
+            graph, PARSE_MEMBER(SpatialMatch, turns),
+            PARSE_MEMBER(SpatialMatch, shifted_count)
+              });
+      }
+      case zxcvbn::MatchPattern::SEQUENCE: {
+        auto sequence_tag = from_val_with_default<GET_MEMBER_TYPE(&zxcvbn::SequenceMatch::sequence_tag)>(val["sequence_name"], zxcvbn::SequenceTag::UNICODE);
+        return zxcvbn::Match(i, j, token, zxcvbn::SequenceMatch{
+            sequence_tag,
+              PARSE_MEMBER_DEF(SequenceMatch, sequence_space, 0),
+              PARSE_MEMBER(SequenceMatch, ascending),
+          });
+      }
+      case zxcvbn::MatchPattern::REPEAT: {
+        return zxcvbn::Match(i, j, token, zxcvbn::RepeatMatch{
+            PARSE_MEMBER(RepeatMatch, base_token),
+            PARSE_MEMBER(RepeatMatch, base_guesses),
+            PARSE_MEMBER_DEF(RepeatMatch, base_matches, std::vector<zxcvbn::Match>{}),
+            PARSE_MEMBER(RepeatMatch, repeat_count),
+              });
+      }
+      case zxcvbn::MatchPattern::REGEX: {
+        auto regex_tag = val_converter<GET_MEMBER_TYPE(&zxcvbn::RegexMatch::regex_tag)>::from(val["regex_name"]);
+        return zxcvbn::Match(i, j, token, zxcvbn::RegexMatch{
+            regex_tag, PARSE_MEMBER(RegexMatch, regex_match),
+          });
+      }
+      case zxcvbn::MatchPattern::DATE: {
+        auto separator = from_val_with_default<std::string>(val["separator"], "");
+        return zxcvbn::Match(i, j, token, zxcvbn::DateMatch{
+            separator,
+            PARSE_MEMBER(DateMatch, year),
+            PARSE_MEMBER(DateMatch, month),
+            PARSE_MEMBER(DateMatch, day),
+            PARSE_MEMBER_DEF(DateMatch, has_full_year, 0),
+          });
+      }
+      case zxcvbn::MatchPattern::BRUTEFORCE: {
+        return zxcvbn::Match(i, j, token, zxcvbn::BruteforceMatch{});
+      }
+      default:
+        assert(pattern == zxcvbn::MatchPattern::UNKNOWN);
+        return zxcvbn::Match(i, j, token, zxcvbn::UnknownMatch{});
+      }
+    }();
+
+    match.guesses = from_val_with_default<zxcvbn::guesses_t>(val["guesses"], 0);
+    match.guesses_log10 = from_val_with_default<zxcvbn::guesses_log10_t>(val["guesses_log10"], 0);
+    return match;
+  }
 
   static emscripten::val to(const zxcvbn::Match & val) {
     auto result = emscripten::val::object();

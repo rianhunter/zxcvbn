@@ -1,6 +1,11 @@
 test = require 'tape'
-scoring = require '../src/scoring'
-matching = require '../src/matching'
+
+ROOT = "../src"
+if process.env.ROOT
+  ROOT = process.env.ROOT
+
+scoring = require (ROOT + '/scoring')
+matching = require (ROOT + '/matching')
 
 log2 = scoring.log2
 log10 = scoring.log10

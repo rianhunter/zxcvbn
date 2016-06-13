@@ -16,6 +16,7 @@ const auto END_UPPER = std::regex(R"(^[^A-Z]+[A-Z]$)");
 const auto ALL_UPPER = std::regex(R"(^[^a-z]+$)");
 const auto ALL_LOWER = std::regex(R"(^[^A-Z]+$)");
 
+const guesses_t MIN_YEAR_SPACE = 20;
 const auto REFERENCE_YEAR = 2016;
 
 struct ScoringResult {
@@ -26,9 +27,33 @@ struct ScoringResult {
   std::vector<std::reference_wrapper<Match>> sequence;
 };
 
+template<class T>
+T nCk(T n, T k) {
+  // http://blog.plover.com/math/choose.html
+  if (k > n) return 0;
+  if (k == 0) return 1;
+  T r = 1;
+  for (T d = 1; d <= k; ++d) {
+    r *= n;
+    r /= d;
+    n -= 1;
+  }
+  return r;
+}
+
 ScoringResult most_guessable_match_sequence(const std::string & password,
                                             std::vector<Match> & matches,
                                             bool exclude_additive = false);
+
+guesses_t estimate_guesses(Match & match, const std::string & password);
+
+#define MATCH_FN(title, upper, lower) \
+  guesses_t lower##_guesses(const Match &);
+MATCH_RUN();
+#undef MATCH_FN
+
+guesses_t uppercase_variations(const Match & match);
+guesses_t l33t_variations(const Match & match);
 
 }
 
