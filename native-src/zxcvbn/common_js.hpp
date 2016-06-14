@@ -5,6 +5,8 @@
 
 #include <emscripten/bind.h>
 
+#include <codecvt>
+#include <locale>
 #include <string>
 #include <vector>
 #include <unordered_map>
@@ -53,7 +55,6 @@ struct val_converter<
        std::is_same<std::decay_t<T>, unsigned long>::value ||
        std::is_same<std::decay_t<T>, float>::value ||
        std::is_same<std::decay_t<T>, double>::value ||
-       std::is_same<std::decay_t<T>, std::string>::value ||
        std::is_same<std::decay_t<T>, std::wstring>::value
        >> {
   static T from(const emscripten::val & val) {
@@ -61,6 +62,29 @@ struct val_converter<
   }
   static emscripten::val to(const T & val) {
     return emscripten::val(val);
+  }
+};
+
+
+inline
+std::string to_utf8(const std::wstring & elt) {
+  std::wstring_convert<std::codecvt_utf8_utf16<wchar_t>> u8towide;
+  return u8towide.to_bytes(elt);
+}
+
+inline
+std::wstring to_wide(const std::string & elt) {
+  std::wstring_convert<std::codecvt_utf8_utf16<wchar_t>> u8towide;
+  return u8towide.from_bytes(elt);
+}
+
+template<>
+struct val_converter<std::string> {
+  static std::string from(const emscripten::val & val) {
+    return to_utf8(from_val<std::wstring>(val));
+  }
+  static emscripten::val to(const std::string & val) {
+    return to_val(to_wide(val));
   }
 };
 

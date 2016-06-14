@@ -82,11 +82,12 @@ void fix_up_graph_tags(emscripten::val & result,
 }
 
 static
-emscripten::val _dictionary_match(const std::string & password,
+emscripten::val _dictionary_match(const std::wstring & wpassword,
                                   const emscripten::val & ranked_dictionaries = emscripten::val::undefined(),
                                   bool reversed = false,
                                   bool l33t = false,
                                   const emscripten::val & l33t_table = emscripten::val::undefined()) {
+  auto password = to_utf8(wpassword);
   std::unordered_map<zxcvbn::DictionaryTag, std::string> _tag_to_name;
   std::unordered_map<zxcvbn::DictionaryTag, zxcvbn::RankedDict> _store;
   zxcvbn::RankedDicts dicts;
@@ -148,35 +149,35 @@ emscripten::val _dictionary_match(const std::string & password,
 }
 
 static
-emscripten::val dictionary_match(const std::string & password,
+emscripten::val dictionary_match(const std::wstring & wpassword,
                                  const emscripten::val & ranked_dictionaries) {
-  return _dictionary_match(password, ranked_dictionaries);
+  return _dictionary_match(wpassword, ranked_dictionaries);
 }
 
 
 static
-emscripten::val dictionary_match(const std::string & password) {
-  return _dictionary_match(password);
+emscripten::val dictionary_match(const std::wstring & wpassword) {
+  return _dictionary_match(wpassword);
 }
 
 static
-emscripten::val reverse_dictionary_match(const std::string & password,
+emscripten::val reverse_dictionary_match(const std::wstring & wpassword,
                                          const emscripten::val & ranked_dictionaries) {
-  return _dictionary_match(password, ranked_dictionaries, true);
+  return _dictionary_match(wpassword, ranked_dictionaries, true);
 }
 
 static
-emscripten::val reverse_dictionary_match(const std::string & password) {
-  return _dictionary_match(password, emscripten::val::undefined(), true);
+emscripten::val reverse_dictionary_match(const std::wstring & wpassword) {
+  return _dictionary_match(wpassword, emscripten::val::undefined(), true);
 }
 
 static
-emscripten::val relevant_l33t_subtable(const std::string & password,
+emscripten::val relevant_l33t_subtable(const std::wstring & wpassword,
                                        const emscripten::val & table) {
   auto ret = val_converter<std::unordered_map<std::string, std::vector<std::string>>>::from(table);
   std::vector<std::pair<std::string, std::vector<std::string>>> ret2;
   std::move(ret.begin(), ret.end(), std::back_inserter(ret2));
-  auto result = zxcvbn::relevant_l33t_subtable(password, ret2);
+  auto result = zxcvbn::relevant_l33t_subtable(to_utf8(wpassword), ret2);
   return to_val(result);
 }
 
@@ -188,20 +189,21 @@ emscripten::val enumerate_l33t_subs(const emscripten::val & table) {
 }
 
 static
-emscripten::val l33t_match(const std::string & password,
+emscripten::val l33t_match(const std::wstring & wpassword,
                            const emscripten::val & ranked_dictionaries,
                            const emscripten::val & table) {
-  return _dictionary_match(password, ranked_dictionaries, false, true, table);
+  return _dictionary_match(wpassword, ranked_dictionaries, false, true, table);
 }
 
 static
-emscripten::val l33t_match(const std::string & password) {
-  return _dictionary_match(password, emscripten::val::undefined(), false, true);
+emscripten::val l33t_match(const std::wstring & wpassword) {
+  return _dictionary_match(wpassword, emscripten::val::undefined(), false, true);
 }
 
 static
-emscripten::val spatial_match(const std::string & password,
+emscripten::val spatial_match(const std::wstring & wpassword,
                               const emscripten::val & graphs_val) {
+  auto password = to_utf8(wpassword);
   zxcvbn::Graphs _new_graph;
 
   std::unordered_map<zxcvbn::GraphTag, std::string> _tag_to_name;
@@ -240,33 +242,33 @@ emscripten::val spatial_match(const std::string & password,
 }
 
 static
-emscripten::val spatial_match(const std::string & password) {
-  return spatial_match(password, emscripten::val::undefined());
+emscripten::val spatial_match(const std::wstring & wpassword) {
+  return spatial_match(wpassword, emscripten::val::undefined());
 }
 
 static
-emscripten::val sequence_match(const std::string & password) {
-  return to_val(zxcvbn::sequence_match(password));
+emscripten::val sequence_match(const std::wstring & wpassword) {
+  return to_val(zxcvbn::sequence_match(to_utf8(wpassword)));
 }
 
 static
-emscripten::val repeat_match(const std::string & password) {
-  return to_val(zxcvbn::repeat_match(password));
+emscripten::val repeat_match(const std::wstring & wpassword) {
+  return to_val(zxcvbn::repeat_match(to_utf8(wpassword)));
 }
 
 static
-emscripten::val regex_match(const std::string & password) {
-  return to_val(zxcvbn::regex_match(password, zxcvbn::REGEXEN));
+emscripten::val regex_match(const std::wstring & wpassword) {
+  return to_val(zxcvbn::regex_match(to_utf8(wpassword), zxcvbn::REGEXEN));
 }
 
 static
-emscripten::val date_match(const std::string & password) {
-  return to_val(zxcvbn::date_match(password));
+emscripten::val date_match(const std::wstring & wpassword) {
+  return to_val(zxcvbn::date_match(to_utf8(wpassword)));
 }
 
 static
-emscripten::val omnimatch(const std::string & password) {
-  auto result = to_val(zxcvbn::omnimatch(password));
+emscripten::val omnimatch(const std::wstring & wpassword) {
+  auto result = to_val(zxcvbn::omnimatch(to_utf8(wpassword)));
 
   fix_up_dictionary_tags(result, _default_dict_tag_to_name);
   fix_up_graph_tags(result, _default_graph_tag_to_name);
@@ -282,33 +284,33 @@ EMSCRIPTEN_BINDINGS(matching) {
   emscripten::function("set_user_input_dictionary", &zxcvbn_js::set_user_input_dictionary);
   emscripten::function("dictionary_match",
                        emscripten::select_overload<emscripten::val(
-                         const std::string &,
+                         const std::wstring &,
                          const emscripten::val &)>(&zxcvbn_js::dictionary_match));
   emscripten::function("dictionary_match",
                        emscripten::select_overload<emscripten::val(
-                         const std::string &)>(&zxcvbn_js::dictionary_match));
+                         const std::wstring &)>(&zxcvbn_js::dictionary_match));
   emscripten::function("reverse_dictionary_match",
                        emscripten::select_overload<emscripten::val(
-                         const std::string &,
+                         const std::wstring &,
                          const emscripten::val &)>(&zxcvbn_js::reverse_dictionary_match));
   emscripten::function("reverse_dictionary_match",
                        emscripten::select_overload<emscripten::val(
-                         const std::string &)>(&zxcvbn_js::reverse_dictionary_match));
+                         const std::wstring &)>(&zxcvbn_js::reverse_dictionary_match));
   emscripten::function("relevant_l33t_subtable", &zxcvbn_js::relevant_l33t_subtable);
   emscripten::function("enumerate_l33t_subs", &zxcvbn_js::enumerate_l33t_subs);
   emscripten::function("l33t_match",
                        emscripten::select_overload<emscripten::val(
-                         const std::string &)>(&zxcvbn_js::l33t_match));
+                         const std::wstring &)>(&zxcvbn_js::l33t_match));
   emscripten::function("l33t_match", emscripten::select_overload<emscripten::val(
-                         const std::string &,
+                         const std::wstring &,
                          const emscripten::val &,
                          const emscripten::val &
                          )>(&zxcvbn_js::l33t_match));
   emscripten::function("spatial_match",
-                       emscripten::select_overload<emscripten::val(const std::string &)>(&zxcvbn_js::spatial_match));
+                       emscripten::select_overload<emscripten::val(const std::wstring &)>(&zxcvbn_js::spatial_match));
   emscripten::function("spatial_match",
                        emscripten::select_overload
-                       <emscripten::val(const std::string &,
+                       <emscripten::val(const std::wstring &,
                                         const emscripten::val &)>
                        (&zxcvbn_js::spatial_match));
   emscripten::function("sequence_match", &zxcvbn_js::sequence_match);
