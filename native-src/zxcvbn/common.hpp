@@ -146,6 +146,8 @@ private:
     token = std::forward<T>(val).token;
     guesses = val.guesses;
     guesses_log10 = val.guesses_log10;
+    idx = val.idx;
+    jdx = val.jdx;
     _pattern = val._pattern;
 
 #define MATCH_FN(title, upper, lower) \
@@ -169,10 +171,13 @@ private:
   }
 
 public:
+  // these are character offsets: [i, j]
   idx_t i, j;
   std::string token;
   guesses_t guesses;
   guesses_log10_t guesses_log10;
+  // these are byte offsets into original string: [idx, jdx)
+  idx_t idx, jdx;
 
   template<class T>
   Match(idx_t i_, idx_t j_, std::string token,
@@ -247,7 +252,7 @@ template<class T>
 Match::Match(idx_t i_, idx_t j_, std::string token,
              T && val) :
   i(i_), j(j_), token(std::move(token)),
-  guesses(), guesses_log10() {
+  guesses(), guesses_log10(), idx(), jdx() {
   _pattern = T::pattern;
   new (&(this->*pattern_type_to_pmc<std::decay_t<T>>::value)) std::decay_t<T>(std::forward<T>(val));
 }

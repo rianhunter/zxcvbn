@@ -74,18 +74,17 @@ static
 std::string translate(const std::string & string,
                       const std::unordered_map<std::string, std::string> & chr_map) {
   std::string toret;
-  for (auto c : string) {
-    // TODO: UTF-8
-    if (c < 0) {
-      toret.push_back(c);
-      continue;
+  auto bit = std::back_inserter(toret);
+  toret.reserve(string.size());
+  for (auto it = string.begin(); it != string.end();) {
+    auto nextit = util::utf8_iter(it, string.end());
+    auto ch = std::string(it, nextit);
+    auto mit = chr_map.find(ch);
+    if (mit != chr_map.end()) {
+      ch = mit->second;
     }
-    std::string ch(1, c);
-    auto it = chr_map.find(ch);
-    if (it != chr_map.end()) {
-      ch = it->second;
-    }
-    std::copy(ch.begin(), ch.end(), std::back_inserter(toret));
+    std::copy(ch.begin(), ch.end(), bit);
+    it = nextit;
   }
   return toret;
 }
@@ -97,6 +96,14 @@ std::vector<Match> & sorted(std::vector<Match> & matches) {
               return std::make_pair(m1.i, m1.j) < std::make_pair(m2.i, m2.j);
             });
   return matches;
+}
+
+static
+std::string dict_normalize(const std::string & str) {
+  // NB: we only have ascii strings in the dictionaries
+  // TODO: when we have more complex strings in the dictionaries,
+  //       do a more complex normalization
+  return util::ascii_lower(str);
 }
 
 std::vector<Match> omnimatch(const std::string & password,
@@ -136,26 +143,28 @@ std::vector<Match> omnimatch(const std::string & password,
 std::vector<Match> dictionary_match(const std::string & password,
                                     const RankedDicts & ranked_dictionaries) {
   std::vector<Match> matches;
-  // TODO: UTF-8
   auto len = password.length();
-  auto password_lower = util::ascii_lower(password);
+  auto password_lower = dict_normalize(password);
   for (const auto & item : ranked_dictionaries) {
     auto dictionary_tag = item.first;
     auto & ranked_dict = item.second;
-    for (decltype(len) i = 0; i < len; ++i) {
-      for (decltype(len) j = i; j < len; ++j) {
-        // TODO: UTF-8
-        auto word = password_lower.substr(i, j - i + 1);
+    for (decltype(len) i = 0, idx = 0; idx < len; util::utf8_decode(password, idx), ++i) {
+      for (decltype(len) j = i, jdx = idx; jdx < len; ++j) {
+        // j is inclusive, but jdx is not so eagerly iterate jdx
+        util::utf8_decode(password, jdx);
+
+        auto word = password_lower.substr(idx, jdx - idx);
         auto it = ranked_dict.find(word);
         if (it != ranked_dict.end()) {
           auto rank = it->second;
-          // TODO: UTF-8
-          matches.push_back(Match(i, j, password.substr(i, j - i + 1),
+          matches.push_back(Match(i, j, password.substr(idx, jdx - idx),
                                   DictionaryMatch{
                                       dictionary_tag,
                                       word, rank,
                                       false,
                                       false, {}, ""}));
+          matches.back().idx = idx;
+          matches.back().jdx = jdx;
         }
       }
     }
@@ -165,6 +174,7 @@ std::vector<Match> dictionary_match(const std::string & password,
 
 std::vector<Match> reverse_dictionary_match(const std::string & password,
                                             const RankedDicts & ranked_dictionaries) {
+  auto clen = util::character_len(password);
   auto reversed_password = util::reverse_string(password);
   auto matches = dictionary_match(reversed_password, ranked_dictionaries);
   for (auto & match : matches) {
@@ -172,9 +182,12 @@ std::vector<Match> reverse_dictionary_match(const std::string & password,
     match.get_dictionary().reversed = true;
     // map coordinates back to original string
     std::tie(match.i, match.j) = std::make_tuple(
-      // TODO: UTF-8
-      password.length() - 1 - match.j,
-      password.length() - 1 - match.i
+      clen - 1 - match.j,
+      clen - 1 - match.i
+      );
+    std::tie(match.idx, match.jdx) = std::make_tuple(
+      password.length() - match.jdx,
+      password.length() - match.idx
       );
   }
   return sorted(matches);
@@ -273,8 +286,8 @@ std::vector<Match> l33t_match(const std::string & password,
     auto subbed_password = translate(password, sub);
     for (auto & match : dictionary_match(subbed_password, ranked_dictionaries)) {
       auto & dmatch = match.get_dictionary();
-      auto token = password.substr(match.i, match.j - match.i + 1);
-      if (util::ascii_lower(token) == dmatch.matched_word) {
+      auto token = password.substr(match.idx, match.jdx - match.idx);
+      if (dict_normalize(token) == dmatch.matched_word) {
         // only return the matches that contain an actual substitution
         continue;
       }
@@ -305,8 +318,7 @@ std::vector<Match> l33t_match(const std::string & password,
         // filter single-character l33t matches to reduce noise.
         // otherwise '1' matches 'i', '4' matches 'a', both very common English words
         // with low dictionary rank.
-        // TODO: UTF-8
-        return a.token.length() <= 1;
+        return util::character_len(a.token) <= 1;
       }),
     matches.end());
 
@@ -340,25 +352,27 @@ std::vector<Match> spatial_match_helper(const std::string & password,
                                         GraphTag graph_tag) {
   std::vector<Match> matches;
   if (!password.length()) return matches;
+  idx_t idx = 0;
   idx_t i = 0;
-  // TODO: UTF-8
-  while (i < password.length() - 1) {
+  auto clen = util::character_len(password);
+  while (i < clen - 1) {
+    auto jdx = idx;
+    util::utf8_decode(password, jdx);
     auto j = i + 1;
     auto last_direction = -1;
     unsigned turns = 0;
     unsigned shifted_count;
     if ((graph_tag == GraphTag::QWERTY ||
          graph_tag == GraphTag::DVORAK) &&
-        // TODO: UTF-8
-        std::regex_search(password.substr(i, 1), SHIFTED_RX)) {
+        std::regex_search(password.substr(idx, jdx - idx), SHIFTED_RX)) {
       shifted_count = 1;
     }
     else {
       shifted_count = 0;
     }
+    auto prev_jdx = idx;
     while (true) {
-      // TODO: UTF-8
-      auto prev_char = password.substr(j - 1, 1);
+      auto prev_char = password.substr(prev_jdx, jdx - prev_jdx);
       auto found = false;
       auto found_direction = -1;
       auto cur_direction = -1;
@@ -370,10 +384,10 @@ std::vector<Match> spatial_match_helper(const std::string & password,
         return std::vector<optional::optional<std::string>>();
       }();
       // consider growing pattern by one character if j hasn't gone over the edge.
-      // TODO: UTF-8
-      if (j < password.length()) {
-        // TODO: UTF-8
-        auto cur_char = password.substr(j, 1);
+      if (j < clen) {
+        auto next_jdx = jdx;
+        util::utf8_decode(password, next_jdx);
+        auto cur_char = password.substr(jdx, next_jdx - jdx);
         for (auto & adj : adjacents) {
           cur_direction += 1;
           if (adj && adj->find(cur_char) != adj->npos) {
@@ -399,17 +413,22 @@ std::vector<Match> spatial_match_helper(const std::string & password,
       // if the current pattern continued, extend j and try to grow again
       if (found) {
         j += 1;
+        prev_jdx = jdx;
+        util::utf8_decode(password, jdx);
       }
       // otherwise push the pattern discovered so far, if any...
       else {
         if (j - i > 2) { // don't consider length 1 or 2 chains.
-          matches.push_back(Match(i, j - 1, password.substr(i, j - i),
+          matches.push_back(Match(i, j - 1, password.substr(idx, jdx - idx),
                                   SpatialMatch{
                                     graph_tag, turns, shifted_count,
                                   }));
+          matches.back().idx = idx;
+          matches.back().jdx = jdx;
         }
         // ...and then start a new search for the rest of the password.
         i = j;
+        idx = jdx;
         break;
       }
     }
@@ -427,7 +446,6 @@ std::vector<Match> repeat_match(const std::string & password) {
   std::regex lazy(R"((.+?)\1+)");
   std::regex lazy_anchored(R"(^(.+?)\1+$)");
   idx_t lastIndex = 0;
-  // TODO: UTF-8
   while (lastIndex < password.length()) {
     auto start_iter = lastIndex + password.begin();
     std::smatch greedy_match, lazy_match;
@@ -461,8 +479,10 @@ std::vector<Match> repeat_match(const std::string & password) {
       match = std::move(lazy_match);
       base_token = match.str(1);
     }
-    auto i = lastIndex + match.position();
-    auto j = lastIndex + match.position() + match[0].length() - 1;
+    auto idx = lastIndex + match.position();
+    auto jdx = lastIndex + match.position() + match[0].length();
+    auto i = util::character_len(password, 0, idx);
+    auto j = i + util::character_len(password, idx, jdx) - 1;
     // recursively match and score the base string
     auto sub_matches = omnimatch(base_token);
     auto base_analysis = most_guessable_match_sequence(
@@ -481,7 +501,9 @@ std::vector<Match> repeat_match(const std::string & password) {
                                 std::move(base_matches),
                                 match[0].length() / base_token.length(),
                                 }));
-    lastIndex = j + 1;
+    matches.back().idx = idx;
+    matches.back().jdx = jdx;
+    lastIndex = jdx;
   }
   return matches;
 }
@@ -501,16 +523,16 @@ std::vector<Match> sequence_match(const std::string & password) {
   // expected result:
   // [(i, j, delta), ...] = [(0, 3, 1), (5, 7, -2), (8, 9, 1)]
 
-  if (password.length() == 1) return {};
+  if (util::character_len(password) == 1) return {};
 
   std::vector<Match> result;
 
   using delta_t = std::int32_t;
 
-  auto update = [&] (idx_t i, idx_t j, delta_t delta) {
+  auto update = [&] (idx_t i, idx_t j, idx_t idx, idx_t jdx, delta_t delta) {
     if (j - i > 1 || std::abs(delta) == 1) {
       if (0 < std::abs(delta) && std::abs(delta) <= MAX_DELTA) {
-        auto token = password.substr(i, j - i + 1);
+        auto token = password.substr(idx, jdx - idx);
         SequenceTag sequence_name;
         unsigned sequence_space;
         if (std::regex_search(token, std::regex(R"(^[a-z]+$)"))) {
@@ -532,27 +554,43 @@ std::vector<Match> sequence_match(const std::string & password) {
         result.push_back(Match(i, j, token,
                                SequenceMatch{sequence_name, sequence_space,
                                    delta > 0}));
-
+        result.back().idx = idx;
+        result.back().jdx = jdx;
       }
     }
   };
 
+  if (!password.size()) return result;
+
   decltype(password.length()) i = 0;
+  decltype(password.length()) idx = 0;
   optional::optional<delta_t> maybe_last_delta;
-  for (idx_t k = 1; k < password.length(); ++k) {
-    // TODO: UTF-8
-    delta_t delta = password[k] - password[k - 1];
+  decltype(password.length()) kdx = 0;
+  auto last_kdx = kdx;
+  auto last_cp = util::utf8_decode(password, kdx);
+  for (idx_t k = 1; kdx < password.length(); ++k) {
+    auto next_kdx = kdx;
+    auto cp = util::utf8_decode(password, next_kdx);
+    assert(kdx != next_kdx);
+    delta_t delta = cp - last_cp;
     if (!maybe_last_delta) {
       maybe_last_delta = delta;
     }
-    if (delta == *maybe_last_delta) continue;
-    auto j = k - 1;
-    update(i, j, *maybe_last_delta);
-    i = j;
-    maybe_last_delta = delta;
+    if (delta != *maybe_last_delta) {
+      auto jdx = kdx;
+      auto j = k - 1;
+      update(i, j, idx, jdx, *maybe_last_delta);
+      i = j;
+      idx = last_kdx;
+      maybe_last_delta = delta;
+    }
+    last_kdx = kdx;
+    kdx = next_kdx;
+    last_cp = cp;
   }
   if (maybe_last_delta) {
-    update(i, password.length() - 1, *maybe_last_delta);
+    update(i, util::character_len(password) - 1,
+           idx, password.size(), *maybe_last_delta);
   }
   return result;
 }
@@ -573,10 +611,16 @@ std::vector<Match> regex_match(const std::string & password,
     while (std::regex_match(lastIndex + password.begin(), password.end(),
                             rx_match, regex)) {
       auto token = rx_match.str(0);
-      matches.push_back(Match(rx_match.position(),
-                              rx_match.position() + rx_match[0].length() - 1,
+      auto idx = lastIndex + rx_match.position();
+      auto jdx = lastIndex + rx_match.position() + rx_match[0].length();
+      assert(token == password.substr(idx, jdx - idx));
+      auto i = util::character_len(password, 0, idx);
+      auto j = i + util::character_len(password, idx, jdx) - 1;
+      matches.push_back(Match(i, j,
                               std::move(token),
                               RegexMatch{tag, PortableRegexMatch(rx_match)}));
+      matches.back().idx = idx;
+      matches.back().jdx = jdx;
       lastIndex += rx_match[0].length();
     }
   }
@@ -625,19 +669,38 @@ std::vector<Match> date_match(const std::string & password) {
   std::regex maybe_date_with_separator(R"(^(\d{1,4})([\s/\\_.-])(\d{1,2})\2(\d{1,4})$)");
 
   // dates without separators are between length 4 '1191' and 8 '11111991'
-  for (decltype(password.length()) i = 0; i + 4 <= password.length(); ++i) {
-    for (decltype(i) j = i + 3; j <= i + 7; ++j) {
-      if (j >= password.length()) break;
-      auto token = password.substr(i, j - i + 1);
+  std::vector<std::string::size_type> offsets;
+  offsets.reserve(9);
+  idx_t idx_dot = 0;
+  for (auto i = 0; i < 9; ++i) {
+    offsets.push_back(idx_dot);
+    if (idx_dot >= password.length()) {
+      break;
+    }
+    util::utf8_decode(password, idx_dot);
+  }
+  assert(offsets.size());
+  for (decltype(password.length()) i = 0; offsets.size() - 1 >= 4; ++i) {
+    auto idx = offsets[0];
+    for (decltype(i) offset = 3; offset <= 7 && offset < offsets.size() - 1; ++offset) {
+      auto j = i + offset;
+      auto jdx = offsets[offset + 1];
+
+      auto token = password.substr(idx, jdx - idx);
+      auto token_chr_len = j - i + 1;
+      assert(util::character_len(token) == token_chr_len);
       if (!std::regex_search(token, maybe_date_no_separator)) continue;
       std::vector<DMY> candidates;
-      for (const auto & item : DATE_SPLITS[token.length() - 4]) {
+      for (const auto & item : DATE_SPLITS[token_chr_len - 4]) {
         auto k = item.first;
         auto l = item.second;
+        auto kdx = offsets[k] - idx;
+        auto ldx = offsets[l] - idx;
+
         auto dmy = map_ints_to_dmy(std::array<date_t, 3>{{
-              stou(token.substr(0, k)),
-              stou(token.substr(k, l - k)),
-              stou(token.substr(l))}});
+              stou(token.substr(0, kdx)),
+              stou(token.substr(kdx, ldx - kdx)),
+              stou(token.substr(ldx))}});
         if (dmy) candidates.push_back(*dmy);
       }
       if (!candidates.size()) continue;
@@ -666,14 +729,36 @@ std::vector<Match> date_match(const std::string & password) {
                                   best_candidate.day,
                                   false,
                                   }));
+      matches.back().idx = idx;
+      matches.back().jdx = jdx;
+    }
+
+    offsets.erase(offsets.begin());
+    if (offsets.back() < password.length()) {
+      auto idx2 = offsets.back();
+      util::utf8_decode(password, idx2);
+      offsets.push_back(idx2);
     }
   }
 
   // dates with separators are between length 6 '1/1/91' and 10 '11/11/1991'
-  for (decltype(password.length()) i = 0; i + 6 <= password.length(); ++i) {
-    for (decltype(password.length()) j = i + 5; j <= i + 9; ++j) {
-      if (j >= password.length()) break;
-      auto token = password.substr(i, j - i + 1);
+  offsets.clear();
+  offsets.reserve(11);
+  idx_dot = 0;
+  for (auto i = 0; i < 11; ++i) {
+    offsets.push_back(idx_dot);
+    if (idx_dot >= password.length()) {
+      break;
+    }
+    util::utf8_decode(password, idx_dot);
+  }
+  assert(offsets.size());
+  for (decltype(password.length()) i = 0; offsets.size() - 1 >= 6; ++i) {
+    auto idx = offsets[0];
+    for (decltype(password.length()) offset = 5; offset <= 9 && offset < offsets.size() - 1; ++offset) {
+      auto j = offset + i;
+      auto jdx = offsets[offset + 1];
+      auto token = password.substr(idx, jdx - idx);
       std::smatch rx_match;
       if (!std::regex_match(token, rx_match, maybe_date_with_separator)) {
         continue;
@@ -690,6 +775,15 @@ std::vector<Match> date_match(const std::string & password) {
                                   dmy->day,
                                   false,
                                   }));
+      matches.back().idx = idx;
+      matches.back().jdx = jdx;
+    }
+
+    offsets.erase(offsets.begin());
+    if (offsets.back() < password.length()) {
+      auto idx2 = offsets.back();
+      util::utf8_decode(password, idx2);
+      offsets.push_back(idx2);
     }
   }
 
