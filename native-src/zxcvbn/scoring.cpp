@@ -47,6 +47,16 @@ void insert_or_assign(M & m, const K & k, V && v) {
   }
 }
 
+static
+std::size_t token_len(const Match & m) __attribute__((pure));
+
+static
+std::size_t token_len(const Match & m) {
+  std::size_t result = m.j - m.i + 1;
+  assert(result == util::character_len(m.token));
+  return result;
+}
+
 // ------------------------------------------------------------------------------
 // search --- most guessable match sequence -------------------------------------
 // ------------------------------------------------------------------------------
@@ -265,7 +275,7 @@ guesses_t estimate_guesses(Match & match, const std::string & password) {
   if (match.guesses) return match.guesses; // a match's guess estimate doesn't change. cache it.
   guesses_t min_guesses = 1;
   if (match.token.length() < password.length()) {
-    min_guesses = (match.token.length() == 1)
+    min_guesses = (token_len(match) == 1)
       ? MIN_SUBMATCH_GUESSES_SINGLE_CHAR
       : MIN_SUBMATCH_GUESSES_MULTI_CHAR;
   }
@@ -287,10 +297,10 @@ guesses_t unknown_guesses(const Match & match) {
 }
 
 guesses_t bruteforce_guesses(const Match & match) {
-  auto guesses = std::pow(BRUTEFORCE_CARDINALITY, match.token.length());
+  auto guesses = std::pow(BRUTEFORCE_CARDINALITY, token_len(match));
   // small detail: make bruteforce matches at minimum one guess bigger than smallest allowed
   // submatch guesses, such that non-bruteforce submatches over the same [i..j] take precedence.
-  auto min_guesses = (match.token.length() == 1)
+  auto min_guesses = (token_len(match) == 1)
     ? MIN_SUBMATCH_GUESSES_SINGLE_CHAR + 1
     : MIN_SUBMATCH_GUESSES_MULTI_CHAR + 1;
   return std::max(guesses, min_guesses);
@@ -301,8 +311,8 @@ guesses_t repeat_guesses(const Match & match) {
 }
 
 guesses_t sequence_guesses(const Match & match) {
-  // TODO: UTF-8
-  auto first_chr = match.token.substr(0, 1);
+  auto second_chr_pos = util::utf8_iter(match.token.begin(), match.token.end());
+  auto first_chr = std::string(match.token.begin(), second_chr_pos);
   guesses_t base_guesses;
   // lower guesses for obvious starting points
   if (first_chr == "a" || first_chr == "A" || first_chr == "z" ||
@@ -325,7 +335,7 @@ guesses_t sequence_guesses(const Match & match) {
     // 2x guesses
     base_guesses *= 2;
   }
-  return base_guesses * match.token.length();
+  return base_guesses * token_len(match);
 }
 
 guesses_t regex_guesses(const Match & match) {
@@ -353,7 +363,7 @@ guesses_t regex_guesses(const Match & match) {
       default: assert(false); return 0;
       }
     }();
-    return std::pow(base, match.token.length());
+    return std::pow(base, token_len(match));
   }
   default:
     return 0;
@@ -393,7 +403,7 @@ guesses_t spatial_guesses(const Match & match) {
     d = KEYPAD_AVERAGE_DEGREE;
   }
   guesses_t guesses = 0;
-  auto L = match.token.length();
+  auto L = token_len(match);
   auto t = static_cast<decltype(L)>(match.get_spatial().turns);
   // estimate the number of possible patterns w/ length L or less with t turns or less.
   for (decltype(L) i = 2; i <= L; ++i) {
@@ -406,7 +416,7 @@ guesses_t spatial_guesses(const Match & match) {
   // math is similar to extra guesses of l33t substitutions in dictionary matches.
   if (match.get_spatial().shifted_count) {
     auto S = match.get_spatial().shifted_count;
-    decltype(S) U = match.token.length() - match.get_spatial().shifted_count; // unshifted count
+    decltype(S) U = token_len(match) - match.get_spatial().shifted_count; // unshifted count
     if (S == 0 || U == 0) {
       guesses *= 2;
     }
@@ -432,7 +442,7 @@ guesses_t dictionary_guesses(const Match & match) {
 
 guesses_t uppercase_variations(const Match & match) {
   auto & word = match.token;
-  if (std::regex_match(word, ALL_LOWER) || util::ascii_lower(word) == word) return 1;
+  if (std::regex_match(word, ALL_LOWER) || !word.size()) return 1;
   // a capitalized word is the most common capitalization scheme,
   // so it only doubles the search space (uncapitalized + capitalized).
   // allcaps and end-capitalized are common enough too, underestimate as 2x factor to be safe.
@@ -444,11 +454,13 @@ guesses_t uppercase_variations(const Match & match) {
   // the number of ways to lowercase U+L letters with L lowercase letters or less.
   auto match_chr = [] (const std::string & str, const std::regex & regex) {
     decltype(str.length()) toret = 0;
-    for (decltype(str.length()) i = 0; i < str.length(); ++i) {
-      auto s = str.substr(i, 1);
+    for (auto it = str.begin(); it != str.end();) {
+      auto it2 = util::utf8_iter(it, str.end());
+      auto s = std::string(it, it2);
       if (std::regex_match(s, regex)) {
         toret += 1;
       }
+      it = it2;
     }
     return toret;
   };
@@ -470,10 +482,15 @@ guesses_t l33t_variations(const Match & match) {
     auto & unsubbed = item.second;
     // lower-case match.token before calculating: capitalization shouldn't affect l33t calc.
     idx_t S = 0, U = 0;
-    for (const auto & c : util::ascii_lower(match.token)) {
-      auto cs = std::string(1, c);
+    // XXX: using ascii_lower is okay for now since our
+    // sub dictionaries are ascii only
+    auto ltoken = util::ascii_lower(match.token);
+    for (auto it = ltoken.begin(); it != ltoken.end();) {
+      auto it2 = util::utf8_iter(it, ltoken.end());
+      auto cs = std::string(it, it2);
       if (cs == subbed) S += 1;
       if (cs == unsubbed) U += 1;
+      it = it2;
     }
     if (!S || !U) {
       // for this sub, password is either fully subbed (444) or fully unsubbed (aaa)
