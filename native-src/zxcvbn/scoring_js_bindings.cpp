@@ -24,9 +24,11 @@ double log10(double a) {
 }
 
 static
-emscripten::val most_guessable_match_sequence(const std::string & password,
+emscripten::val most_guessable_match_sequence(const std::wstring & wpassword,
                                               emscripten::val matches,
                                               bool exclude_additive) {
+  auto password = to_utf8(wpassword);
+
   // NB: preserving the reference semantics of the JS version requires
   //     some careful plumbing (returning input match references,
   //     propagating mutations)
@@ -69,14 +71,16 @@ emscripten::val most_guessable_match_sequence(const std::string & password,
 }
 
 static
-emscripten::val most_guessable_match_sequence(const std::string & password,
+emscripten::val most_guessable_match_sequence(const std::wstring & wpassword,
                                               emscripten::val matches) {
-  return most_guessable_match_sequence(password, std::move(matches), false);
+  return most_guessable_match_sequence(wpassword, std::move(matches), false);
 }
 
 static
 zxcvbn::guesses_t estimate_guesses(emscripten::val match,
-                                   const std::string & password) {
+                                   const std::wstring & wpassword) {
+  auto password = to_utf8(wpassword);
+
   auto native_match = from_val<zxcvbn::Match>(match);
   auto result = zxcvbn::estimate_guesses(native_match, password);
 
@@ -136,14 +140,14 @@ EMSCRIPTEN_BINDINGS(scoring) {
   emscripten::function("most_guessable_match_sequence",
                        emscripten::select_overload<
                        emscripten::val
-                       (const std::string & password,
+                       (const std::wstring & password,
                         emscripten::val matches,
                         bool exclude_additive)>
                        (&zxcvbn_js::most_guessable_match_sequence));
   emscripten::function("most_guessable_match_sequence",
                        emscripten::select_overload<
                        emscripten::val
-                       (const std::string & password,
+                       (const std::wstring & password,
                         emscripten::val matches)>
                        (&zxcvbn_js::most_guessable_match_sequence));
   emscripten::function("estimate_guesses", &zxcvbn_js::estimate_guesses);

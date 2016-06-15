@@ -3,6 +3,8 @@
 
 #include <zxcvbn/common.hpp>
 
+#include <zxcvbn/util.hpp>
+
 #include <emscripten/bind.h>
 
 #include <codecvt>
@@ -206,7 +208,11 @@ struct val_converter<zxcvbn::Match> {
   static zxcvbn::Match from(const emscripten::val & val) {
     auto i = from_val_with_default<zxcvbn::idx_t>(val["i"], 0);
     auto j = from_val_with_default<zxcvbn::idx_t>(val["j"], 0);
-    auto token = from_val_with_default<std::string>(val["token"], "");
+    auto token = from_val_with_default<std::string>(val["token"], std::string(j - i + 1, '_'));
+    auto tlen = zxcvbn::util::character_len(token);
+    if (tlen != (j - i + 1)) {
+      j = i + tlen - 1;
+    }
 
 #define MATCH_FN(title, upper, lower) {#lower, zxcvbn::MatchPattern::upper},
     const auto _default_name_to_pattern = std::unordered_map<std::string, zxcvbn::MatchPattern>{MATCH_RUN()};
