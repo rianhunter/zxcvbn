@@ -4,6 +4,11 @@ CXX=emcc
 CXXFLAGS=-std=c++14 -Inative-src -Wall -Wextra -Werror
 CXXLDFLAGS=-std=c++14 --bind --memory-init-file 0
 
+ifdef RELEASE
+CXXFLAGS += -Oz -flto -DNDEBUG
+CXXLDFLAGS += -Oz -flto --closure 1
+endif
+
 ADJACENCY_GRAPHS_SOURCES=adjacency_graphs_js_bindings.cpp adjacency_graphs.cpp
 MATCHING_SOURCES=matching_js_bindings.cpp matching.cpp scoring.cpp adjacency_graphs.cpp _frequency_lists.cpp frequency_lists.cpp util.cpp
 SCORING_SOURCES=scoring_js_bindings.cpp scoring.cpp adjacency_graphs.cpp _frequency_lists.cpp frequency_lists.cpp util.cpp
