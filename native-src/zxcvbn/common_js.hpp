@@ -2,6 +2,7 @@
 #define __ZXCVBN__COMMON_JS_HPP
 
 #include <zxcvbn/common.hpp>
+#include <zxcvbn/feedback.hpp>
 
 #include <zxcvbn/util.hpp>
 
@@ -468,6 +469,16 @@ struct val_converter<zxcvbn::optional::optional<T>> {
     else {
       return to_val(*val);
     }
+  }
+};
+
+template<>
+struct val_converter<zxcvbn::Feedback> {
+  static emscripten::val to(const zxcvbn::Feedback & val) {
+    auto result = emscripten::val::object();
+    result.set("warning", to_val(val.warning));
+    result.set("suggestions", to_val(val.suggestions));
+    return result;
   }
 };
 
