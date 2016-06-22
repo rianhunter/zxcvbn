@@ -20,66 +20,6 @@ void set_user_input_dictionary(const emscripten::val & ordered_list) {
   user_input_dictionary = zxcvbn::build_ranked_dict(ret);
 };
 
-template<class K, class V>
-std::unordered_map<V, K> invert_dict(const std::unordered_map<K, V> & dict) {
-  std::unordered_map<V, K> result;
-  for (const auto & item : dict) {
-    result.insert(std::make_pair(item.second, item.first));
-  }
-  return result;
-}
-
-const auto _default_dict_tag_to_name = std::unordered_map<zxcvbn::DictionaryTag, std::string>{
-  {zxcvbn::DictionaryTag::PASSWORDS, "passwords"},
-  {zxcvbn::DictionaryTag::ENGLISH_WIKIPEDIA, "english_wikipedia"},
-  {zxcvbn::DictionaryTag::FEMALE_NAMES, "female_names"},
-  {zxcvbn::DictionaryTag::SURNAMES, "surnames"},
-  {zxcvbn::DictionaryTag::US_TV_AND_FILM, "us_tv_and_film"},
-  {zxcvbn::DictionaryTag::MALE_NAMES, "male_names"},
-  {zxcvbn::DictionaryTag::USER_INPUTS, "user_inputs"},
-};
-
-const auto _default_name_to_dict_tag = invert_dict(_default_dict_tag_to_name);
-
-const auto _default_graph_tag_to_name = std::unordered_map<zxcvbn::GraphTag, std::string> {
-  {zxcvbn::GraphTag::QWERTY, "qwerty"},
-  {zxcvbn::GraphTag::DVORAK, "dvorak"},
-  {zxcvbn::GraphTag::KEYPAD, "keypad"},
-  {zxcvbn::GraphTag::MAC_KEYPAD, "mac_keypad"},
-};
-
-const auto _default_name_to_graph_tag = invert_dict(_default_graph_tag_to_name);
-
-using DictTagType = std::underlying_type_t<zxcvbn::DictionaryTag>;
-using GraphTagType = std::underlying_type_t<zxcvbn::GraphTag>;
-
-static
-void fix_up_dictionary_tags(emscripten::val & result,
-                            const std::unordered_map<zxcvbn::DictionaryTag, std::string> & _tag_to_name) {
-  auto len = result["length"].as<std::size_t>();
-  for (decltype(len) i = 0; i < len; ++i) {
-    auto v = result[i];
-    if (v["_dictionary_tag"].isUndefined()) continue;
-    auto val = v["_dictionary_tag"].as<DictTagType>();
-    auto it = _tag_to_name.find(static_cast<zxcvbn::DictionaryTag>(val));
-    assert(it != _tag_to_name.end());
-    v.set("dictionary_name", it->second);
-  }
-}
-
-static
-void fix_up_graph_tags(emscripten::val & result,
-                       const std::unordered_map<zxcvbn::GraphTag, std::string> & _tag_to_name) {
-  auto len = result["length"].as<std::size_t>();
-  for (decltype(len) i = 0; i < len; ++i) {
-    auto v = result[i];
-    if (v["_graph"].isUndefined()) continue;
-    auto val = v["_graph"].as<GraphTagType>();
-    auto it = _tag_to_name.find(static_cast<zxcvbn::GraphTag>(val));
-    assert(it != _tag_to_name.end());
-    v.set("graph", it->second);
-  }
-}
 
 static
 emscripten::val _dictionary_match(const std::wstring & wpassword,

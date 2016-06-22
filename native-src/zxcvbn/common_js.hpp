@@ -203,6 +203,39 @@ struct val_converter<zxcvbn::PortableRegexMatch> {
   }
 };
 
+template<class K, class V>
+std::unordered_map<V, K> invert_dict(const std::unordered_map<K, V> & dict) {
+  std::unordered_map<V, K> result;
+  for (const auto & item : dict) {
+    result.insert(std::make_pair(item.second, item.first));
+  }
+  return result;
+}
+
+const auto _default_dict_tag_to_name = std::unordered_map<zxcvbn::DictionaryTag, std::string>{
+  {zxcvbn::DictionaryTag::PASSWORDS, "passwords"},
+  {zxcvbn::DictionaryTag::ENGLISH_WIKIPEDIA, "english_wikipedia"},
+  {zxcvbn::DictionaryTag::FEMALE_NAMES, "female_names"},
+  {zxcvbn::DictionaryTag::SURNAMES, "surnames"},
+  {zxcvbn::DictionaryTag::US_TV_AND_FILM, "us_tv_and_film"},
+  {zxcvbn::DictionaryTag::MALE_NAMES, "male_names"},
+  {zxcvbn::DictionaryTag::USER_INPUTS, "user_inputs"},
+};
+
+const auto _default_name_to_dict_tag = invert_dict(_default_dict_tag_to_name);
+
+const auto _default_graph_tag_to_name = std::unordered_map<zxcvbn::GraphTag, std::string> {
+  {zxcvbn::GraphTag::QWERTY, "qwerty"},
+  {zxcvbn::GraphTag::DVORAK, "dvorak"},
+  {zxcvbn::GraphTag::KEYPAD, "keypad"},
+  {zxcvbn::GraphTag::MAC_KEYPAD, "mac_keypad"},
+};
+
+const auto _default_name_to_graph_tag = invert_dict(_default_graph_tag_to_name);
+
+using DictTagType = std::underlying_type_t<zxcvbn::DictionaryTag>;
+using GraphTagType = std::underlying_type_t<zxcvbn::GraphTag>;
+
 template<>
 struct val_converter<zxcvbn::Match> {
   static zxcvbn::Match from(const emscripten::val & val) {
@@ -261,17 +294,9 @@ struct val_converter<zxcvbn::Match> {
             return static_cast<zxcvbn::DictionaryTag>(0);
           }
           auto dictionary_name = val_converter<std::string>::from(val["dictionary_name"]);
-          const auto _default_name_to_tag = std::unordered_map<std::string, zxcvbn::DictionaryTag>{
-            {"passwords", zxcvbn::DictionaryTag::PASSWORDS},
-            {"english_wikipedia", zxcvbn::DictionaryTag::ENGLISH_WIKIPEDIA},
-            {"female_names", zxcvbn::DictionaryTag::FEMALE_NAMES},
-            {"surnames", zxcvbn::DictionaryTag::SURNAMES},
-            {"us_tv_and_film", zxcvbn::DictionaryTag::US_TV_AND_FILM},
-            {"male_names", zxcvbn::DictionaryTag::MALE_NAMES},
-            {"user_inputs", zxcvbn::DictionaryTag::USER_INPUTS},
-          };
-          auto it2 = _default_name_to_tag.find(dictionary_name);
-          if (it2 == _default_name_to_tag.end()) throw std::runtime_error("invalid dictionary");
+
+          auto it2 = _default_name_to_dict_tag.find(dictionary_name);
+          if (it2 == _default_name_to_dict_tag.end()) throw std::runtime_error("invalid dictionary");
           return it2->second;
         }();
 
@@ -288,15 +313,9 @@ struct val_converter<zxcvbn::Match> {
               });
       }
       case zxcvbn::MatchPattern::SPATIAL: {
-        const auto _default_name_to_tag = std::unordered_map<std::string, zxcvbn::GraphTag>{
-          {"qwerty", zxcvbn::GraphTag::QWERTY},
-          {"dvorak", zxcvbn::GraphTag::DVORAK},
-          {"keypad", zxcvbn::GraphTag::KEYPAD},
-          {"mac_keypad", zxcvbn::GraphTag::MAC_KEYPAD},
-        };
         auto graph_name = val_converter<std::string>::from(val["graph"]);
-        auto it2 = _default_name_to_tag.find(graph_name);
-        if (it2 == _default_name_to_tag.end()) throw std::runtime_error("bad graph tag!");
+        auto it2 = _default_name_to_graph_tag.find(graph_name);
+        if (it2 == _default_name_to_graph_tag.end()) throw std::runtime_error("bad graph tag!");
         auto graph = it2->second;
 
         return zxcvbn::Match(i, j, token, zxcvbn::SpatialMatch{
@@ -365,7 +384,7 @@ struct val_converter<zxcvbn::Match> {
     case zxcvbn::MatchPattern::DICTIONARY: {
       auto & dmatch = val.get_dictionary();
       result.set("pattern", "dictionary");
-      result.set("_dictionary_tag", to_val(std::underlying_type_t<zxcvbn::DictionaryTag>(dmatch.dictionary_tag)));
+      result.set("_dictionary_tag", to_val(DictTagType(dmatch.dictionary_tag)));
       result.set("matched_word", to_val(dmatch.matched_word));
       result.set("rank", to_val(dmatch.rank));
       result.set("l33t", to_val(dmatch.l33t));
@@ -377,7 +396,7 @@ struct val_converter<zxcvbn::Match> {
     case zxcvbn::MatchPattern::SPATIAL: {
       auto & dmatch = val.get_spatial();
       result.set("pattern", "spatial");
-      result.set("_graph", to_val(std::underlying_type_t<zxcvbn::GraphTag>(dmatch.graph)));
+      result.set("_graph", to_val(GraphTagType(dmatch.graph)));
       result.set("turns", to_val(dmatch.turns));
       result.set("shifted_count", to_val(dmatch.shifted_count));
       break;
@@ -451,6 +470,34 @@ struct val_converter<zxcvbn::optional::optional<T>> {
     }
   }
 };
+
+inline
+void fix_up_dictionary_tags(emscripten::val & result,
+                            const std::unordered_map<zxcvbn::DictionaryTag, std::string> & _tag_to_name = _default_dict_tag_to_name) {
+  auto len = result["length"].as<std::size_t>();
+  for (decltype(len) i = 0; i < len; ++i) {
+    auto v = result[i];
+    if (v["_dictionary_tag"].isUndefined()) continue;
+    auto val = v["_dictionary_tag"].as<DictTagType>();
+    auto it = _tag_to_name.find(static_cast<zxcvbn::DictionaryTag>(val));
+    assert(it != _tag_to_name.end());
+    v.set("dictionary_name", it->second);
+  }
+}
+
+inline
+void fix_up_graph_tags(emscripten::val & result,
+                       const std::unordered_map<zxcvbn::GraphTag, std::string> & _tag_to_name = _default_graph_tag_to_name) {
+  auto len = result["length"].as<std::size_t>();
+  for (decltype(len) i = 0; i < len; ++i) {
+    auto v = result[i];
+    if (v["_graph"].isUndefined()) continue;
+    auto val = v["_graph"].as<GraphTagType>();
+    auto it = _tag_to_name.find(static_cast<zxcvbn::GraphTag>(val));
+    assert(it != _tag_to_name.end());
+    v.set("graph", it->second);
+  }
+}
 
 }
 
