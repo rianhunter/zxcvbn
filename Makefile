@@ -10,9 +10,9 @@ CXXLDFLAGS += -Oz -flto --closure 1
 endif
 
 ADJACENCY_GRAPHS_SOURCES=adjacency_graphs_js_bindings.cpp adjacency_graphs.cpp
-MATCHING_SOURCES=matching_js_bindings.cpp matching.cpp scoring.cpp adjacency_graphs.cpp _frequency_lists.cpp frequency_lists.cpp util.cpp
-SCORING_SOURCES=scoring_js_bindings.cpp scoring.cpp adjacency_graphs.cpp _frequency_lists.cpp frequency_lists.cpp util.cpp
-ZXCVBN_SOURCES=zxcvbn_js_bindings.cpp matching.cpp scoring.cpp adjacency_graphs.cpp _frequency_lists.cpp frequency_lists.cpp util.cpp time_estimates.cpp feedback.cpp
+MATCHING_SOURCES=matching_js_bindings.cpp matching.cpp scoring.cpp adjacency_graphs.cpp frequency_lists.cpp js_frequency_lists.cpp util.cpp
+SCORING_SOURCES=scoring_js_bindings.cpp scoring.cpp adjacency_graphs.cpp frequency_lists.cpp js_frequency_lists.cpp util.cpp
+ZXCVBN_SOURCES=zxcvbn_js_bindings.cpp matching.cpp scoring.cpp adjacency_graphs.cpp frequency_lists.cpp js_frequency_lists.cpp util.cpp time_estimates.cpp feedback.cpp
 
 PREFIX=native-src/zxcvbn
 
@@ -33,6 +33,7 @@ clean:
 	-rm $(MATCHING_EXE) $(MATCHING_OBJECTS)
 	-rm $(SCORING_EXE) $(SCORING_OBJECTS)
 	-rm $(ADJACENCY_GRAPHS_EXE)
+	-rm lib/pre.js lib/_frequency_lists.inc.js
 	-rm $(PREFIX)/_frequency_lists.hpp $(PREFIX)/_frequency_lists.cpp
 	-rm $(PREFIX)/adjacency_graphs.hpp $(PREFIX)/adjacency_graphs.cpp
 	-rm $(ZXCVBN_OBJECTS)
@@ -49,24 +50,31 @@ test-scoring: $(MATCHING_EXE) $(ADJACENCY_GRAPHS_EXE) $(SCORING_EXE)
 	ROOT="../lib" node_modules/.bin/coffeetape test/test-scoring.coffee | node_modules/.bin/faucet
 
 $(MATCHING_EXE): $(MATCHING_OBJECTS)
-	$(CXX) $(CXXLDFLAGS) $^ -o $@
+	$(CXX) $(CXXLDFLAGS) --pre-js lib/pre.js $(MATCHING_OBJECTS) -o $@
 
 $(SCORING_EXE): $(SCORING_OBJECTS)
-	$(CXX) $(CXXLDFLAGS) $^ -o $@
+	$(CXX) $(CXXLDFLAGS) --pre-js lib/pre.js $(SCORING_OBJECTS) -o $@
 
 $(ADJACENCY_GRAPHS_EXE): $(ADJACENCY_GRAPHS_OBJECTS)
 	$(CXX) $(CXXLDFLAGS) $^ -o $@
 
 $(ZXCVBN_EXE): $(ZXCVBN_OBJECTS) zxcvbn_post.js
-	$(CXX) $(CXXLDFLAGS) -s 'MODULARIZE=1' -s 'EXPORT_NAME="zxcvbn"' $(ZXCVBN_OBJECTS) -o $@
+	$(CXX) $(CXXLDFLAGS) --pre-js lib/pre.js -s 'MODULARIZE=1' -s 'EXPORT_NAME="zxcvbn"' $(ZXCVBN_OBJECTS) -o $@
 	mv $@ $@.tmp
 	cat $@.tmp zxcvbn_post.js > $@
 	rm $@.tmp
 
+$(MATCHING_EXE) $(SCORING_EXE) $(ZXCVBN_EXE): lib/pre.js
+
+lib/pre.js: lib/_frequency_lists.inc.js
+	echo "var Module = eval('(function() { try { return Module || {} } catch(e) { return {} } })()'); Module['_frequency_lists'] = " > $@
+	cat lib/_frequency_lists.inc.js >> $@
+	echo ";" >> $@
+
 $(PREFIX)/_frequency_lists.hpp:
 	python data-scripts/build_frequency_lists.py data/ $@
 
-$(PREFIX)/_frequency_lists.cpp:
+lib/_frequency_lists.inc.js:
 	python data-scripts/build_frequency_lists.py data/ $@
 
 $(PREFIX)/adjacency_graphs.hpp:
