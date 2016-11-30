@@ -1,3 +1,4 @@
+import math
 import sys
 
 from zxcvbn._zxcvbn import lib, ffi
@@ -12,6 +13,12 @@ def _maybe_encode(password):
         return password.encode('utf8')
     return password
 
+def round_to_x_digits(number, digits):
+    """
+    Returns 'number' rounded to 'digits' digits.
+    """
+    return round(number * math.pow(10, digits)) / math.pow(10, digits)
+
 def password_strength(password, user_inputs=()):
     user_inputs = list(map(lambda x: ffi.new("char[]", _maybe_encode(x)), user_inputs))
     user_inputs.append(ffi.NULL)
@@ -20,10 +27,13 @@ def password_strength(password, user_inputs=()):
                                        guesses, ffi.NULL)
     if err:
         raise Exception("Error!")
-    return dict(guesses=guesses[0])
+    return dict(
+        password=password,
+        guesses=guesses[0],
+        entropy=round_to_x_digits(math.log10(guesses[0]) / math.log10(2),
+                                  3),
+    )
 
 if __name__ == "__main__":
-    import math
     result = password_strength("correcthorsebatterystaple")
-    print(result['guesses'])
-    print(math.log10(result['guesses']))
+    print(result)
