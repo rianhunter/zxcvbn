@@ -1,7 +1,7 @@
 import math
 import sys
 
-from zxcvbn._zxcvbn import lib, ffi
+from zxcvbncpp._zxcvbncpp import lib, ffi
 
 if sys.version_info[0] >= 3:
     str_type = str
@@ -30,8 +30,7 @@ def password_strength(password, user_inputs=()):
     return dict(
         password=password,
         guesses=guesses[0],
-        entropy=round_to_x_digits(math.log10(guesses[0]) / math.log10(2),
-                                  3),
+        entropy=round_to_x_digits(math.log(guesses[0], 2), 3),
     )
 
 if __name__ == "__main__":

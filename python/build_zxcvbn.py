@@ -45,7 +45,7 @@ else:
 EXTRA_COMPILE_ARGS = ["-std=c++14", "-fvisibility=hidden", "-Os", "-flto"]
 EXTRA_LINK_ARGS = ["-fvisibility=hidden", "-Os", "-flto"]
 
-ffi.set_source("zxcvbn._zxcvbn", amalg.getvalue().decode('utf-8'),
+ffi.set_source("zxcvbncpp._zxcvbncpp", amalg.getvalue().decode('utf-8'),
                include_dirs=[src_dir],
                extra_compile_args=EXTRA_COMPILE_ARGS,
                extra_link_args=EXTRA_LINK_ARGS,
