@@ -64,16 +64,19 @@ test-matching: $(MATCHING_EXE) $(ADJACENCY_GRAPHS_EXE)
 test-scoring: $(MATCHING_EXE) $(ADJACENCY_GRAPHS_EXE) $(SCORING_EXE)
 	ROOT="../lib" node_modules/.bin/coffeetape test/test-scoring.coffee | node_modules/.bin/faucet
 
-$(MATCHING_EXE): $(MATCHING_OBJECTS)
+lib:
+	mkdir lib
+
+$(MATCHING_EXE): $(MATCHING_OBJECTS) lib
 	$(CXX) $(CXXLDFLAGS) --pre-js lib/pre.js $(MATCHING_OBJECTS) -o $@
 
-$(SCORING_EXE): $(SCORING_OBJECTS)
+$(SCORING_EXE): $(SCORING_OBJECTS) lib
 	$(CXX) $(CXXLDFLAGS) --pre-js lib/pre.js $(SCORING_OBJECTS) -o $@
 
-$(ADJACENCY_GRAPHS_EXE): $(ADJACENCY_GRAPHS_OBJECTS)
-	$(CXX) $(CXXLDFLAGS) $^ -o $@
+$(ADJACENCY_GRAPHS_EXE): $(ADJACENCY_GRAPHS_OBJECTS) lib
+	$(CXX) $(CXXLDFLAGS) $(ADJACENCY_GRAPHS_OBJECTS) -o $@
 
-$(ZXCVBN_EXE): $(ZXCVBN_OBJECTS) zxcvbn_post.js
+$(ZXCVBN_EXE): $(ZXCVBN_OBJECTS) zxcvbn_post.js lib
 	$(CXX) $(CXXLDFLAGS) --pre-js lib/pre.js -s 'MODULARIZE=1' -s 'EXPORT_NAME="zxcvbn"' $(ZXCVBN_OBJECTS) -o $@
 	mv $@ $@.tmp
 	cat $@.tmp zxcvbn_post.js > $@
@@ -81,7 +84,7 @@ $(ZXCVBN_EXE): $(ZXCVBN_OBJECTS) zxcvbn_post.js
 
 $(MATCHING_EXE) $(SCORING_EXE) $(ZXCVBN_EXE): lib/pre.js
 
-lib/pre.js: lib/_frequency_lists.inc.js
+lib/pre.js: lib/_frequency_lists.inc.js lib
 	echo "var Module = eval('(function() { try { return Module || {} } catch(e) { return {} } })()'); Module['_frequency_lists'] = " > $@
 	cat lib/_frequency_lists.inc.js >> $@
 	echo ";" >> $@
@@ -89,7 +92,7 @@ lib/pre.js: lib/_frequency_lists.inc.js
 $(PREFIX)/_frequency_lists.hpp:
 	python data-scripts/build_frequency_lists.py data/ $@
 
-lib/_frequency_lists.inc.js:
+lib/_frequency_lists.inc.js: lib
 	python data-scripts/build_frequency_lists.py data/ $@
 
 $(PREFIX)/adjacency_graphs.hpp:
