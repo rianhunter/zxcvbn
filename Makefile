@@ -9,6 +9,12 @@ CXXFLAGS += -Oz -flto -DNDEBUG
 CXXLDFLAGS += -Oz -flto --closure 1
 endif
 
+ifdef RELEASE
+BUILD_SUFFIX=.RELEASE.o
+else
+BUILD_SUFFIX=.o
+endif
+
 ADJACENCY_GRAPHS_SOURCES=adjacency_graphs_js_bindings.cpp adjacency_graphs.cpp
 MATCHING_SOURCES=matching_js_bindings.cpp matching.cpp scoring.cpp adjacency_graphs.cpp frequency_lists.cpp js_frequency_lists.cpp util.cpp
 SCORING_SOURCES=scoring_js_bindings.cpp scoring.cpp adjacency_graphs.cpp frequency_lists.cpp js_frequency_lists.cpp util.cpp
@@ -16,27 +22,36 @@ ZXCVBN_SOURCES=zxcvbn_js_bindings.cpp matching.cpp scoring.cpp adjacency_graphs.
 
 PREFIX=native-src/zxcvbn
 
-ADJACENCY_GRAPHS_OBJECTS=$(addprefix $(PREFIX)/, $(ADJACENCY_GRAPHS_SOURCES:.cpp=.o))
+ADJACENCY_GRAPHS_OBJECTS=$(addprefix $(PREFIX)/, $(ADJACENCY_GRAPHS_SOURCES:.cpp=$(BUILD_SUFFIX)))
 ADJACENCY_GRAPHS_EXE=lib/adjacency_graphs.js
 
-MATCHING_OBJECTS=$(addprefix $(PREFIX)/, $(MATCHING_SOURCES:.cpp=.o))
+MATCHING_OBJECTS=$(addprefix $(PREFIX)/, $(MATCHING_SOURCES:.cpp=$(BUILD_SUFFIX)))
 MATCHING_EXE=lib/matching.js
 
-SCORING_OBJECTS=$(addprefix $(PREFIX)/, $(SCORING_SOURCES:.cpp=.o))
+SCORING_OBJECTS=$(addprefix $(PREFIX)/, $(SCORING_SOURCES:.cpp=$(BUILD_SUFFIX)))
 SCORING_EXE=lib/scoring.js
 
-ZXCVBN_OBJECTS=$(addprefix $(PREFIX)/, $(ZXCVBN_SOURCES:.cpp=.o))
+ZXCVBN_OBJECTS=$(addprefix $(PREFIX)/, $(ZXCVBN_SOURCES:.cpp=$(BUILD_SUFFIX)))
 ZXCVBN_EXE=lib/zxcvbn.js
 
 .PHONY : clean
 clean:
-	-rm $(MATCHING_EXE) $(MATCHING_OBJECTS)
-	-rm $(SCORING_EXE) $(SCORING_OBJECTS)
-	-rm $(ADJACENCY_GRAPHS_EXE)
-	-rm lib/pre.js lib/_frequency_lists.inc.js
-	-rm $(PREFIX)/_frequency_lists.hpp $(PREFIX)/_frequency_lists.cpp
-	-rm $(PREFIX)/adjacency_graphs.hpp $(PREFIX)/adjacency_graphs.cpp
-	-rm $(ZXCVBN_OBJECTS)
+	-rm -f $(MATCHING_EXE)
+	-rm -f $(addprefix $(PREFIX)/, $(MATCHING_SOURCES:.cpp=.o))
+	-rm -f $(addprefix $(PREFIX)/, $(MATCHING_SOURCES:.cpp=.RELEASE.o))
+	-rm -f $(SCORING_EXE)
+	-rm -f $(addprefix $(PREFIX)/, $(SCORING_SOURCES:.cpp=.o))
+	-rm -f $(addprefix $(PREFIX)/, $(SCORING_SOURCES:.cpp=.RELEASE.o))
+	-rm -f $(ADJACENCY_GRAPHS_EXE)
+	-rm -f $(addprefix $(PREFIX)/, $(ADJACENCY_GRAPHS_SOURCES:.cpp=.o))
+	-rm -f $(addprefix $(PREFIX)/, $(ADJACENCY_GRAPHS_SOURCES:.cpp=.RELEASE.o))
+	-rm -f lib/pre.js lib/_frequency_lists.inc.js
+	-rm -f $(PREFIX)/_frequency_lists.hpp $(PREFIX)/_frequency_lists.cpp
+	-rm -f $(PREFIX)/adjacency_graphs.hpp $(PREFIX)/adjacency_graphs.cpp
+	-rm -f $(ZXCVBN_EXE)
+	-rm -f $(addprefix $(PREFIX)/, $(ZXCVBN_SOURCES:.cpp=.o))
+	-rm -f $(addprefix $(PREFIX)/, $(ZXCVBN_SOURCES:.cpp=.RELEASE.o))
+
 
 .PHONY: test
 test: test-matching test-scoring
@@ -85,5 +100,5 @@ $(PREFIX)/adjacency_graphs.cpp:
 
 $(ZXCVBN_OBJECTS) $(ADJACENCY_GRAPHS_OBJECTS) $(SCORING_OBJECTS) $(MATCHING_OBJECTS): $(PREFIX)/adjacency_graphs.hpp $(PREFIX)/_frequency_lists.hpp $(shell find $(PREFIX) -type f -name '*.hpp')
 
-.cpp.o:
+%$(BUILD_SUFFIX) : %.cpp
 	$(CXX) $(CXXFLAGS) -c $< -o $@
