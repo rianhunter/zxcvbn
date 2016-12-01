@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/env python
 import os
 import sys
 import json
@@ -79,7 +79,7 @@ def build_graph(layout_str, slanted):
             position_table[(x,y)] = token
 
     adjacency_graph = {}
-    for (x,y), chars in position_table.iteritems():
+    for (x,y), chars in position_table.items():
         for char in chars:
             adjacency_graph[char] = []
             for coord in adjacency_func(x, y):
@@ -177,7 +177,7 @@ def output_cpp(cpp_file):
         # find out largest adjacency_list
         largest = max(len(adj)
                       for (_, args2) in GRAPHS
-                      for adj in build_graph(*args2).itervalues())
+                      for adj in build_graph(*args2).values())
 
         f.write("""namespace zxcvbn {
 
@@ -237,7 +237,7 @@ const Graphs & graphs() {
 
 if __name__ == '__main__':
     if len(sys.argv) != 2:
-        print usage()
+        print(usage())
         sys.exit(0)
 
     output_file = sys.argv[1]
