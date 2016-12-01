@@ -196,7 +196,7 @@ const auto no = optional::nullopt;
 
             f.write("  {GraphTag::%s, {\n" % (name.upper(),));
 
-            for key, adj in graph.iteritems():
+            for key, adj in sorted(graph.items()):
                 f.write('    {"%s", {%s}},\n' %
                         (escape(key), ', '.join('M("' + escape(a) + '")'
                                                 if a else
