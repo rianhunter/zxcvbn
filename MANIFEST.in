@@ -1,0 +1,5 @@
+recursive-include data *.txt
+include data-scripts/build_frequency_lists.py
+include data-scripts/build_keyboard_adjacency_graphs.py
+recursive-include native-src *.hpp *.cpp *.h
+include python-src/build_zxcvbn.py

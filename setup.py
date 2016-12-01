@@ -1,15 +1,18 @@
+import os
+
 from setuptools import setup
 
 setup(
     name="zxcvbncpp",
-    version='1.0',
+    version='1.0.1',
     description='Password strength estimator',
     author='Rian Hunter',
     author_email='rian@alum.mit.edu',
-    url='https://github.com/rianhunter/zxcvbn',
+    url='https://github.com/rianhunter/zxcvbn-cpp',
+    package_dir={'' : 'python-src'},
     packages=["zxcvbncpp"],
     setup_requires=["cffi>=1.0.0"],
-    cffi_modules=["build_zxcvbn.py:ffi"],
+    cffi_modules=[os.path.join("python-src", "build_zxcvbn.py:ffi")],
     install_requires=[
         "cffi>=1.0.0",
     ],

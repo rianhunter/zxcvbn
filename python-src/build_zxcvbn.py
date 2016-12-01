@@ -15,11 +15,11 @@ src_dir = os.path.join(root_dir, "native-src")
 module_src_dir = os.path.join(src_dir, "zxcvbn")
 
 for fnout in ["_frequency_lists.hpp", "_frequency_lists.cpp"]:
-    subprocess.check_call(["python", os.path.join(root_dir, "data-scripts", "build_frequency_lists.py"),
+    subprocess.check_call([sys.executable, os.path.join(root_dir, "data-scripts", "build_frequency_lists.py"),
                            os.path.join(root_dir, "data"), os.path.join(module_src_dir, fnout)])
 
 for fnout in ["adjacency_graphs.hpp", "adjacency_graphs.cpp"]:
-    subprocess.check_call(["python", os.path.join(root_dir, "data-scripts", "build_keyboard_adjacency_graphs.py"),
+    subprocess.check_call([sys.executable, os.path.join(root_dir, "data-scripts", "build_keyboard_adjacency_graphs.py"),
                            os.path.join(module_src_dir, fnout)])
 
 # now produce amalgamation *shudders*

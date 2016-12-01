@@ -18,7 +18,6 @@ codebase.
 ### Build
 
 ```shell
-$ cd python
 $ python setup.py install
 ```
 
