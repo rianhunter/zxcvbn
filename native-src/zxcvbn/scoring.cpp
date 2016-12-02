@@ -208,7 +208,6 @@ ScoringResult most_guessable_match_sequence(const std::string & password,
         g = candidate_g;
       }
     }
-    assert(k >= 0);
     while (true) {
       auto it = optimal.m[k].find(l);
       assert(it != optimal.m[k].end());
