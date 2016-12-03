@@ -1,11 +1,11 @@
 # zxcvbn-cpp
 
 This is a C++ port of [`zxcvbn`](https://github.com/dropbox/zxcvbn),
-an advanced password estimation library. For more details on how
+an advanced password strength estimation library. For more details on how
 `zxcvbn` works and its advantages, check out
 [the blog post](https://tech.dropbox.com/2012/04/zxcvbn-realistic-password-strength-estimation/).
 
-This port is a direct transcription of the original CoffeeScript
+This port is a direct translation of the original CoffeeScript
 source. This allows this port to easily stay in sync with the original
 source. Additionally, this port uses the same exact test scripts from
 the original with the help of emscripten.
