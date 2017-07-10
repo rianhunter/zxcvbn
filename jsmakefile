@@ -85,7 +85,7 @@ $(ZXCVBN_EXE): $(ZXCVBN_OBJECTS) zxcvbn_post.js lib
 $(MATCHING_EXE) $(SCORING_EXE) $(ZXCVBN_EXE): lib/pre.js
 
 lib/pre.js: lib/_frequency_lists.inc.js lib
-	echo "var Module = eval('(function() { try { return Module || {} } catch(e) { return {} } })()'); Module['_frequency_lists'] = " > $@
+	echo "var Module = (function() { try { return Module || {} } catch(e) { return {} } })(); Module['_frequency_lists'] = " > $@
 	cat lib/_frequency_lists.inc.js >> $@
 	echo ";" >> $@
 
